@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
-from app.models import GitHubPushInfo
+from app.models import GitHubPushInfo, GitHubPRInfo
 
 
 def get_commit_info() -> tuple[str, str]:
@@ -93,6 +93,27 @@ def main():
         )
         # 生成飞书卡片消息
         message = push_info.create_feishu_card()
+    
+    # 处理 Pull Request 事件
+    elif event_name == "pull_request":
+        action = os.environ.get("GITHUB_EVENT_ACTION", "")
+        pr_merged = os.environ.get("PR_MERGED", "false").lower() == "true"
+        
+        # 创建 PR 信息对象
+        pr_info = GitHubPRInfo(
+            repo_name=os.environ.get("GITHUB_REPOSITORY", ""),
+            pr_title=os.environ.get("PR_TITLE", ""),
+            pr_number=int(os.environ.get("PR_NUMBER", "0")),
+            author_name=os.environ.get("GITHUB_ACTOR", ""),
+            action=action,
+            is_merged=pr_merged,
+            source_branch=os.environ.get("GITHUB_HEAD_REF", ""),
+            target_branch=os.environ.get("GITHUB_BASE_REF", ""),
+            pr_url=os.environ.get("PR_URL", "")
+        )
+        # 生成飞书卡片消息
+        message = pr_info.create_feishu_card()
+    
     else:
         print(f"忽略的事件类型: {event_name}")
         return

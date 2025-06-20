@@ -15,175 +15,29 @@ jobs:
     - name: 检出代码
       uses: actions/checkout@v4
       
-    - name: 获取推送信息
-      id: get_info
+    - name: 设置Python环境
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: 安装依赖
       run: |
-        echo "COMMIT_SHA=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
-        echo "COMMIT_MESSAGE=$(git log --format=%B -n 1 ${{ github.sha }} | head -n 1)" >> $GITHUB_OUTPUT
-        echo "BRANCH_NAME=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-        echo "REPO_NAME=${{ github.repository }}" >> $GITHUB_OUTPUT
-        echo "AUTHOR_NAME=${{ github.actor }}" >> $GITHUB_OUTPUT
+        pip install requests
         
     - name: 发送飞书通知
+      env:
+        FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+        FEISHU_SECRET: ${{ secrets.FEISHU_SECRET }}
+        GITHUB_EVENT_NAME: ${{ github.event_name }}
+        GITHUB_EVENT_ACTION: ${{ github.event.action }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        GITHUB_REF_NAME: ${{ github.ref_name }}
+        GITHUB_ACTOR: ${{ github.actor }}
+        GITHUB_SHA: ${{ github.sha }}
+        GITHUB_HEAD_REF: ${{ github.head_ref }}
+        GITHUB_BASE_REF: ${{ github.base_ref }}
+        PR_TITLE: ${{ github.event.pull_request.title }}
+        PR_URL: ${{ github.event.pull_request.html_url }}
+        PR_MERGED: ${{ github.event.pull_request.merged }}
       run: |
-        # 检查是否配置了飞书 Webhook URL
-        if [ -z "${{ secrets.FEISHU_WEBHOOK_URL }}" ]; then
-          echo "⚠️ 未配置 FEISHU_WEBHOOK_URL，跳过飞书通知"
-          exit 0
-        fi
-        
-        # 生成时间戳
-        timestamp=$(date +%s)
-        
-        # 构建基础消息体
-        if [ "${{ github.event_name }}" = "push" ]; then
-          message_body='{
-            "msg_type": "interactive",
-            "card": {
-              "elements": [
-                {
-                  "tag": "div",
-                  "text": {
-                    "content": "🚀 **代码推送通知**\n\n**仓库**: ${{ steps.get_info.outputs.REPO_NAME }}\n**分支**: ${{ steps.get_info.outputs.BRANCH_NAME }}\n**提交者**: ${{ steps.get_info.outputs.AUTHOR_NAME }}\n**提交ID**: `${{ steps.get_info.outputs.COMMIT_SHA }}`\n**提交信息**: ${{ steps.get_info.outputs.COMMIT_MESSAGE }}",
-                    "tag": "lark_md"
-                  }
-                },
-                {
-                  "actions": [
-                    {
-                      "tag": "button",
-                      "text": {
-                        "content": "查看提交",
-                        "tag": "lark_md"
-                      },
-                      "url": "https://github.com/${{ github.repository }}/commit/${{ github.sha }}",
-                      "type": "default",
-                      "value": {}
-                    }
-                  ],
-                  "tag": "action"
-                }
-              ],
-              "header": {
-                "title": {
-                  "content": "GitHub 推送通知",
-                  "tag": "plain_text"
-                },
-                "template": "blue"
-              }
-            }
-          }'
-        elif [ "${{ github.event_name }}" = "pull_request" ]; then
-          if [ "${{ github.event.action }}" = "opened" ]; then
-            message_body='{
-              "msg_type": "interactive",
-              "card": {
-                "elements": [
-                  {
-                    "tag": "div",
-                    "text": {
-                      "content": "📋 **Pull Request 创建通知**\n\n**仓库**: ${{ github.repository }}\n**分支**: ${{ github.head_ref }} → ${{ github.base_ref }}\n**创建者**: ${{ github.actor }}\n**标题**: ${{ github.event.pull_request.title }}",
-                      "tag": "lark_md"
-                    }
-                  },
-                  {
-                    "actions": [
-                      {
-                        "tag": "button",
-                        "text": {
-                          "content": "查看 PR",
-                          "tag": "lark_md"
-                        },
-                        "url": "${{ github.event.pull_request.html_url }}",
-                        "type": "default",
-                        "value": {}
-                      }
-                    ],
-                    "tag": "action"
-                  }
-                ],
-                "header": {
-                  "title": {
-                    "content": "GitHub PR 通知",
-                    "tag": "plain_text"
-                  },
-                  "template": "green"
-                }
-              }
-            }'
-          elif [ "${{ github.event.action }}" = "closed" ] && [ "${{ github.event.pull_request.merged }}" = "true" ]; then
-            message_body='{
-              "msg_type": "interactive",
-              "card": {
-                "elements": [
-                  {
-                    "tag": "div",
-                    "text": {
-                      "content": "✅ **Pull Request 合并通知**\n\n**仓库**: ${{ github.repository }}\n**分支**: ${{ github.head_ref }} → ${{ github.base_ref }}\n**合并者**: ${{ github.actor }}\n**标题**: ${{ github.event.pull_request.title }}",
-                      "tag": "lark_md"
-                    }
-                  },
-                  {
-                    "actions": [
-                      {
-                        "tag": "button",
-                        "text": {
-                          "content": "查看 PR",
-                          "tag": "lark_md"
-                        },
-                        "url": "${{ github.event.pull_request.html_url }}",
-                        "type": "default",
-                        "value": {}
-                      }
-                    ],
-                    "tag": "action"
-                  }
-                ],
-                "header": {
-                  "title": {
-                    "content": "GitHub PR 合并通知",
-                    "tag": "plain_text"
-                  },
-                  "template": "purple"
-                }
-              }
-            }'
-          else
-            echo "忽略的PR事件: ${{ github.event.action }}"
-            exit 0
-          fi
-        else
-          echo "忽略的事件类型: ${{ github.event_name }}"
-          exit 0
-        fi
-        
-        # 如果配置了签名密钥，添加签名
-        if [ -n "${{ secrets.FEISHU_SECRET }}" ]; then
-          # 生成签名
-          string_to_sign="${timestamp}\n${{ secrets.FEISHU_SECRET }}"
-          sign=$(echo -ne "$string_to_sign" | openssl dgst -sha256 -hmac "" -binary | base64)
-          
-          # 添加时间戳和签名到消息体
-          final_message=$(echo "$message_body" | jq --arg ts "$timestamp" --arg sign "$sign" '. + {timestamp: $ts, sign: $sign}')
-        else
-          final_message="$message_body"
-        fi
-        
-        # 发送消息
-        echo "发送飞书消息..."
-        response=$(curl -s -w "%{http_code}" -X POST "${{ secrets.FEISHU_WEBHOOK_URL }}" \
-          -H "Content-Type: application/json" \
-          -d "$final_message")
-        
-        http_code="${response: -3}"
-        response_body="${response%???}"
-        
-        echo "HTTP状态码: $http_code"
-        echo "响应内容: $response_body"
-        
-        if [ "$http_code" = "200" ]; then
-          echo "✅ 飞书消息发送成功"
-        else
-          echo "❌ 飞书消息发送失败"
-          exit 1
-        fi
+        python3 .github/scripts/feishu_notify.py

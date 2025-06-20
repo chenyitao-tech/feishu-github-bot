@@ -41,4 +41,4 @@ jobs:
         PR_MERGED: ${{ github.event.pull_request.merged }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
       run: |
-        python3 .github/scripts/feishu_notify.py
+        python3 scripts/feishu_notify.py

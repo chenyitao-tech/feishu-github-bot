@@ -7,9 +7,9 @@ import requests
 import subprocess
 import sys
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
-from app.github_push import GitHubPushInfo
-from app.github_pr import GitHubPRInfo
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+from feishu_bot.github_push import GitHubPushInfo
+from feishu_bot.github_pr import GitHubPRInfo
 
 
 def get_commit_info() -> tuple[str, str]:

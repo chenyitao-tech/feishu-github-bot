@@ -32,10 +32,12 @@ jobs:
           exit 0
         fi
         
+        # 生成时间戳
+        timestamp=$(date +%s)
+        
+        # 构建基础消息体
         if [ "${{ github.event_name }}" = "push" ]; then
-          curl -X POST "${{ secrets.FEISHU_WEBHOOK_URL }}" \
-          -H "Content-Type: application/json" \
-          -d '{
+          message_body='{
             "msg_type": "interactive",
             "card": {
               "elements": [
@@ -73,9 +75,7 @@ jobs:
           }'
         elif [ "${{ github.event_name }}" = "pull_request" ]; then
           if [ "${{ github.event.action }}" = "opened" ]; then
-            curl -X POST "${{ secrets.FEISHU_WEBHOOK_URL }}" \
-            -H "Content-Type: application/json" \
-            -d '{
+            message_body='{
               "msg_type": "interactive",
               "card": {
                 "elements": [
@@ -112,9 +112,7 @@ jobs:
               }
             }'
           elif [ "${{ github.event.action }}" = "closed" ] && [ "${{ github.event.pull_request.merged }}" = "true" ]; then
-            curl -X POST "${{ secrets.FEISHU_WEBHOOK_URL }}" \
-            -H "Content-Type: application/json" \
-            -d '{
+            message_body='{
               "msg_type": "interactive",
               "card": {
                 "elements": [
@@ -150,5 +148,42 @@ jobs:
                 }
               }
             }'
+          else
+            echo "忽略的PR事件: ${{ github.event.action }}"
+            exit 0
           fi
+        else
+          echo "忽略的事件类型: ${{ github.event_name }}"
+          exit 0
+        fi
+        
+        # 如果配置了签名密钥，添加签名
+        if [ -n "${{ secrets.FEISHU_SECRET }}" ]; then
+          # 生成签名
+          string_to_sign="${timestamp}\n${{ secrets.FEISHU_SECRET }}"
+          sign=$(echo -ne "$string_to_sign" | openssl dgst -sha256 -hmac "" -binary | base64)
+          
+          # 添加时间戳和签名到消息体
+          final_message=$(echo "$message_body" | jq --arg ts "$timestamp" --arg sign "$sign" '. + {timestamp: $ts, sign: $sign}')
+        else
+          final_message="$message_body"
+        fi
+        
+        # 发送消息
+        echo "发送飞书消息..."
+        response=$(curl -s -w "%{http_code}" -X POST "${{ secrets.FEISHU_WEBHOOK_URL }}" \
+          -H "Content-Type: application/json" \
+          -d "$final_message")
+        
+        http_code="${response: -3}"
+        response_body="${response%???}"
+        
+        echo "HTTP状态码: $http_code"
+        echo "响应内容: $response_body"
+        
+        if [ "$http_code" = "200" ]; then
+          echo "✅ 飞书消息发送成功"
+        else
+          echo "❌ 飞书消息发送失败"
+          exit 1
         fi

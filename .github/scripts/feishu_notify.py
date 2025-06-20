@@ -50,7 +50,7 @@ def create_push_card(repo_name, branch_name, author_name, commit_sha, commit_mes
                 {
                     "tag": "div",
                     "text": {
-                        "content": f"🚀 **代码推送通知**\\n\\n**仓库**: {repo_name}\\n**分支**: {branch_name}\\n**提交者**: {author_name}\\n**提交ID**: `{commit_sha}`\\n**提交信息**: {commit_message}",
+                        "content": f"🚀 **代码推送通知**\n\n• **仓库**: {repo_name}\n• **分支**: {branch_name}\n• **提交者**: {author_name}\n• **提交ID**: `{commit_sha}`\n• **提交信息**: {commit_message}",
                         "tag": "lark_md"
                     }
                 },

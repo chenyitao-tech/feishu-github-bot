@@ -1,9 +1,3 @@
-"""
-常量配置文件
-存储飞书机器人的配置信息
-"""
-
-# 飞书机器人配置
 FEISHU_WEBHOOK_URL = "https://open.feishu.cn/open-apis/bot/v2/hook/8bfe55f6-afce-418d-a8ac-3346262417e6"
 FEISHU_SECRET = "hwYaNNh81lJVs7RUdqVMZd"
 

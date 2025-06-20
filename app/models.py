@@ -1,69 +1,11 @@
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
-class GitHubCommit(BaseModel):
-    """GitHub提交信息模型"""
-    message: str
-    url: Optional[str] = None
-    author: Optional[Dict[str, Any]] = None
-
-
-class GitHubRepository(BaseModel):
-    """GitHub仓库信息模型"""
-    full_name: str
-    html_url: Optional[str] = None
-    name: Optional[str] = None
-
-
-class GitHubPusher(BaseModel):
-    """GitHub推送者信息模型"""
-    name: str
-    email: Optional[str] = None
-
-
-class GitHubWebhookPayload(BaseModel):
-    """GitHub Webhook载荷模型"""
-    ref: str
-    repository: GitHubRepository
-    pusher: GitHubPusher
-    commits: List[GitHubCommit]
-    before: Optional[str] = None
-    after: Optional[str] = None
-
-
-class FeishuTextContent(BaseModel):
-    """飞书文本内容模型"""
-    text: str
-
-
-class FeishuTextMessage(BaseModel):
-    """飞书文本消息模型"""
-    msg_type: str = "text"
-    content: FeishuTextContent
-    timestamp: Optional[str] = None
-    sign: Optional[str] = None
-
-
-class FeishuCardElement(BaseModel):
-    """飞书卡片元素模型"""
-    tag: str
-    text: Optional[Dict[str, str]] = None
-    fields: Optional[List[Dict[str, Any]]] = None
-    actions: Optional[List[Dict[str, Any]]] = None
-
-
-class FeishuCard(BaseModel):
-    """飞书消息卡片模型"""
-    elements: List[Dict[str, Any]]
-
-
-class FeishuCardMessage(BaseModel):
-    """飞书卡片消息模型"""
-    msg_type: str = "interactive"
-    card: FeishuCard
-    timestamp: Optional[str] = None
-    sign: Optional[str] = None
+class HealthCheck(BaseModel):
+    """健康检查模型"""
+    status: str = "healthy"
+    message: str = "Service is running"
 
 
 class APIResponse(BaseModel):
@@ -73,14 +15,95 @@ class APIResponse(BaseModel):
     data: Optional[Dict[str, Any]] = None
 
 
-class HealthCheck(BaseModel):
-    """健康检查模型"""
-    status: str = "healthy"
-    service: str = "feishu-github-bot"
-    version: str = "1.0.0"
-    endpoints: Dict[str, str] = Field(default_factory=lambda: {
-        "health": "/health",
-        "test": "/test", 
-        "webhook": "/github-webhook",
-        "docs": "/docs"
-    }) 
+# 飞书消息相关模型
+class FeishuText(BaseModel):
+    """飞书文本内容"""
+    content: str
+    tag: str = "lark_md"
+
+
+class FeishuButton(BaseModel):
+    """飞书按钮"""
+    tag: str = "button"
+    text: FeishuText
+    url: str
+    type: str = "default"
+    value: Dict[str, Any] = {}
+
+
+class FeishuAction(BaseModel):
+    """飞书动作组件"""
+    tag: str = "action"
+    actions: List[FeishuButton]
+
+
+class FeishuDiv(BaseModel):
+    """飞书div元素"""
+    tag: str = "div"
+    text: FeishuText
+
+
+class FeishuHeader(BaseModel):
+    """飞书卡片头部"""
+    title: FeishuText
+    template: str = "blue"
+
+
+class FeishuCard(BaseModel):
+    """飞书卡片"""
+    elements: List[Dict[str, Any]]
+    header: FeishuHeader
+
+
+class FeishuCardMessage(BaseModel):
+    """飞书卡片消息"""
+    msg_type: str = "interactive"
+    card: FeishuCard
+    timestamp: Optional[str] = None
+    sign: Optional[str] = None
+
+    def model_dump(self, **kwargs) -> Dict[str, Any]:
+        """自定义序列化方法"""
+        return super().model_dump(exclude_none=True, **kwargs)
+
+
+# GitHub 推送通知专用模型
+class GitHubPushInfo(BaseModel):
+    """GitHub推送信息"""
+    repo_name: str
+    branch_name: str
+    author_name: str
+    commit_sha: str
+    commit_message: str
+    commit_url: str
+
+    @classmethod
+    def create_feishu_card(cls, push_info: 'GitHubPushInfo') -> FeishuCardMessage:
+        """创建飞书推送通知卡片"""
+        # 创建文本内容
+        content_text = FeishuText(
+            content=f"🚀 **代码推送通知**\n\n• **仓库**: {push_info.repo_name}\n• **分支**: {push_info.branch_name}\n• **提交者**: {push_info.author_name}\n• **提交ID**: `{push_info.commit_sha}`\n• **提交信息**: {push_info.commit_message}"
+        )
+        # 创建div元素
+        div_element = FeishuDiv(text=content_text)
+        # 创建按钮
+        view_button = FeishuButton(
+            text=FeishuText(content="查看提交"),
+            url=push_info.commit_url
+        )
+        # 创建动作组件
+        action_element = FeishuAction(actions=[view_button])
+        # 创建头部
+        header = FeishuHeader(
+            title=FeishuText(content="GitHub 推送通知", tag="plain_text")
+        )
+        # 创建卡片
+        card = FeishuCard(
+            elements=[
+                div_element.model_dump(),
+                action_element.model_dump()
+            ],
+            header=header
+        )
+        # 创建完整消息
+        return FeishuCardMessage(card=card)

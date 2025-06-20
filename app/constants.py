@@ -10,7 +10,7 @@ FEISHU_SECRET = "hwYaNNh81lJVs7RUdqVMZd"
 # GitHub配置（可选，用于验证webhook请求的安全性）
 # 这个密钥需要与GitHub仓库Webhook设置中的Secret保持一致
 # 如果不需要验证，可以留空
-GITHUB_SECRET = "my-github-webhook-secret-2024"  # 自定义密钥，与GitHub Webhook设置保持一致
+GITHUB_SECRET = "mluQWsgP1KmICAjHERKJPNkaJj_cJ2DIfgbfNs7H7lQ"  # 与GitHub Webhook设置保持一致
 
 # 服务配置
 HOST = "0.0.0.0"

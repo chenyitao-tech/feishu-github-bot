@@ -6,52 +6,9 @@ import time
 import requests
 import subprocess
 import sys
-from typing import Dict, Any, Optional
-from dataclasses import dataclass
 
-
-@dataclass
-class GitHubPushInfo:
-    """GitHub推送信息"""
-    repo_name: str
-    branch_name: str
-    author_name: str
-    commit_sha: str
-    commit_message: str
-    commit_url: str
-
-    def create_feishu_card(self) -> Dict[str, Any]:
-        """创建飞书推送通知卡片"""
-        return {
-            "msg_type": "interactive",
-            "card": {
-                "elements": [
-                    {
-                        "tag": "div",
-                        "text": {
-                            "content": f"🚀 **代码推送通知**\n\n• **仓库**: {self.repo_name}\n• **分支**: {self.branch_name}\n• **提交者**: {self.author_name}\n• **提交ID**: `{self.commit_sha}`\n• **提交信息**: {self.commit_message}",
-                            "tag": "lark_md",
-                        },
-                    },
-                    {
-                        "actions": [
-                            {
-                                "tag": "button",
-                                "text": {"content": "查看提交", "tag": "lark_md"},
-                                "url": self.commit_url,
-                                "type": "default",
-                                "value": {},
-                            }
-                        ],
-                        "tag": "action",
-                    },
-                ],
-                "header": {
-                    "title": {"content": "GitHub 推送通知", "tag": "plain_text"},
-                    "template": "blue",
-                },
-            },
-        }
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
+from app.models import GitHubPushInfo
 
 
 def get_commit_info() -> tuple[str, str]:
@@ -80,9 +37,6 @@ def generate_signature(timestamp: str, secret: str) -> str | None:
         string_to_sign.encode("utf-8"), digestmod=hashlib.sha256
     ).digest()
     return base64.b64encode(hmac_code).decode("utf-8")
-
-
-
 
 
 def send_feishu_message(webhook_url: str, message: dict, secret: str | None = None) -> bool:

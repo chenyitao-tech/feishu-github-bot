@@ -1,0 +1,154 @@
+name: 飞书推送通知
+
+on:
+  push:
+    branches: [ '*' ]  # 监听所有分支的推送
+  pull_request:
+    branches: [ '*' ]  # 监听所有分支的PR
+    types: [opened, closed]
+
+jobs:
+  notify-feishu:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+      
+    - name: 获取推送信息
+      id: get_info
+      run: |
+        echo "COMMIT_SHA=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+        echo "COMMIT_MESSAGE=$(git log --format=%B -n 1 ${{ github.sha }} | head -n 1)" >> $GITHUB_OUTPUT
+        echo "BRANCH_NAME=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+        echo "REPO_NAME=${{ github.repository }}" >> $GITHUB_OUTPUT
+        echo "AUTHOR_NAME=${{ github.actor }}" >> $GITHUB_OUTPUT
+        
+    - name: 发送飞书通知
+      run: |
+        # 检查是否配置了飞书 Webhook URL
+        if [ -z "${{ secrets.FEISHU_WEBHOOK_URL }}" ]; then
+          echo "⚠️ 未配置 FEISHU_WEBHOOK_URL，跳过飞书通知"
+          exit 0
+        fi
+        
+        if [ "${{ github.event_name }}" = "push" ]; then
+          curl -X POST "${{ secrets.FEISHU_WEBHOOK_URL }}" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "msg_type": "interactive",
+            "card": {
+              "elements": [
+                {
+                  "tag": "div",
+                  "text": {
+                    "content": "🚀 **代码推送通知**\n\n**仓库**: ${{ steps.get_info.outputs.REPO_NAME }}\n**分支**: ${{ steps.get_info.outputs.BRANCH_NAME }}\n**提交者**: ${{ steps.get_info.outputs.AUTHOR_NAME }}\n**提交ID**: `${{ steps.get_info.outputs.COMMIT_SHA }}`\n**提交信息**: ${{ steps.get_info.outputs.COMMIT_MESSAGE }}",
+                    "tag": "lark_md"
+                  }
+                },
+                {
+                  "actions": [
+                    {
+                      "tag": "button",
+                      "text": {
+                        "content": "查看提交",
+                        "tag": "lark_md"
+                      },
+                      "url": "https://github.com/${{ github.repository }}/commit/${{ github.sha }}",
+                      "type": "default",
+                      "value": {}
+                    }
+                  ],
+                  "tag": "action"
+                }
+              ],
+              "header": {
+                "title": {
+                  "content": "GitHub 推送通知",
+                  "tag": "plain_text"
+                },
+                "template": "blue"
+              }
+            }
+          }'
+        elif [ "${{ github.event_name }}" = "pull_request" ]; then
+          if [ "${{ github.event.action }}" = "opened" ]; then
+            curl -X POST "${{ secrets.FEISHU_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "msg_type": "interactive",
+              "card": {
+                "elements": [
+                  {
+                    "tag": "div",
+                    "text": {
+                      "content": "📋 **Pull Request 创建通知**\n\n**仓库**: ${{ github.repository }}\n**分支**: ${{ github.head_ref }} → ${{ github.base_ref }}\n**创建者**: ${{ github.actor }}\n**标题**: ${{ github.event.pull_request.title }}",
+                      "tag": "lark_md"
+                    }
+                  },
+                  {
+                    "actions": [
+                      {
+                        "tag": "button",
+                        "text": {
+                          "content": "查看 PR",
+                          "tag": "lark_md"
+                        },
+                        "url": "${{ github.event.pull_request.html_url }}",
+                        "type": "default",
+                        "value": {}
+                      }
+                    ],
+                    "tag": "action"
+                  }
+                ],
+                "header": {
+                  "title": {
+                    "content": "GitHub PR 通知",
+                    "tag": "plain_text"
+                  },
+                  "template": "green"
+                }
+              }
+            }'
+          elif [ "${{ github.event.action }}" = "closed" ] && [ "${{ github.event.pull_request.merged }}" = "true" ]; then
+            curl -X POST "${{ secrets.FEISHU_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "msg_type": "interactive",
+              "card": {
+                "elements": [
+                  {
+                    "tag": "div",
+                    "text": {
+                      "content": "✅ **Pull Request 合并通知**\n\n**仓库**: ${{ github.repository }}\n**分支**: ${{ github.head_ref }} → ${{ github.base_ref }}\n**合并者**: ${{ github.actor }}\n**标题**: ${{ github.event.pull_request.title }}",
+                      "tag": "lark_md"
+                    }
+                  },
+                  {
+                    "actions": [
+                      {
+                        "tag": "button",
+                        "text": {
+                          "content": "查看 PR",
+                          "tag": "lark_md"
+                        },
+                        "url": "${{ github.event.pull_request.html_url }}",
+                        "type": "default",
+                        "value": {}
+                      }
+                    ],
+                    "tag": "action"
+                  }
+                ],
+                "header": {
+                  "title": {
+                    "content": "GitHub PR 合并通知",
+                    "tag": "plain_text"
+                  },
+                  "template": "purple"
+                }
+              }
+            }'
+          fi
+        fi

@@ -15,8 +15,7 @@ from feishu_bot.github_pr import GitHubPRInfo
 def get_commit_info() -> tuple[str, str]:
     """获取提交信息"""
     try:
-        commit_sha = os.environ.get("GITHUB_SHA", "")[:7]  # 获取提交ID（前7位）
-        # 获取提交信息
+        commit_sha = os.environ.get("GITHUB_SHA", "")[:7]
         result = subprocess.run(
             ["git", "log", "--format=%B", "-n", "1", os.environ.get("GITHUB_SHA", "")],
             capture_output=True,
@@ -29,7 +28,7 @@ def get_commit_info() -> tuple[str, str]:
         return "", ""
 
 
-def generate_signature(timestamp: str, secret: str) -> str | None:
+def gen_feishu_signature(timestamp: str, secret: str) -> str | None:
     """生成飞书签名"""
     if not secret:
         return None
@@ -45,7 +44,7 @@ def send_feishu_message(webhook_url: str, message: dict, secret: str | None = No
     timestamp = str(int(time.time()))
     # 如果有密钥，添加签名
     if secret:
-        sign = generate_signature(timestamp, secret)
+        sign = gen_feishu_signature(timestamp, secret)
         message["timestamp"] = timestamp
         message["sign"] = sign
     try:

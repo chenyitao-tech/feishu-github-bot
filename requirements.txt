@@ -9,5 +9,6 @@ pymysql==1.1.1
 pytest==8.3.5
 pytest-asyncio==0.26.0
 readerwriterlock==1.0.9
+requests==2.32.3
 sqlalchemy==2.0.41
 uvicorn[standard]==0.34.0

@@ -1,15 +1,16 @@
-import os
-import hmac
-import hashlib
 import base64
-import time
-import requests
+import hashlib
+import hmac
+import os
 import subprocess
 import sys
+import time
+
+import requests
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-from feishu_bot.github_push import GitHubPushInfo
 from feishu_bot.github_pr import GitHubPRInfo
+from feishu_bot.github_push import GitHubPushInfo
 
 
 def get_commit_info() -> tuple[str, str]:
@@ -33,16 +34,13 @@ def gen_feishu_signature(timestamp: str, secret: str) -> str | None:
     if not secret:
         return None
     string_to_sign = f"{timestamp}\n{secret}"
-    hmac_code = hmac.new(
-        string_to_sign.encode("utf-8"), digestmod=hashlib.sha256
-    ).digest()
+    hmac_code = hmac.new(string_to_sign.encode("utf-8"), digestmod=hashlib.sha256).digest()
     return base64.b64encode(hmac_code).decode("utf-8")
 
 
 def send_feishu_message(webhook_url: str, message: dict, secret: str | None = None) -> bool:
     """发送飞书消息"""
     timestamp = str(int(time.time()))
-    # 如果有密钥，添加签名
     if secret:
         sign = gen_feishu_signature(timestamp, secret)
         message["timestamp"] = timestamp
@@ -79,27 +77,24 @@ def main():
     print(f"📡 处理GitHub事件: {event_name}")
     message = None
 
-    # 处理推送事件
-    if event_name == "push":
+    if event_name == "push":  # 处理推送事件
         commit_sha, commit_message = get_commit_info()
-        # 创建推送信息对象
+
         push_info = GitHubPushInfo(
             repo_name=os.environ.get("GITHUB_REPOSITORY", ""),
             branch_name=os.environ.get("GITHUB_REF_NAME", ""),
             author_name=os.environ.get("GITHUB_ACTOR", ""),
             commit_sha=commit_sha,
             commit_message=commit_message,
-            commit_url=f"https://github.com/{os.environ.get('GITHUB_REPOSITORY', '')}/commit/{os.environ.get('GITHUB_SHA', '')}"
+            commit_url=f"https://github.com/{os.environ.get('GITHUB_REPOSITORY', '')}/commit/{os.environ.get('GITHUB_SHA', '')}",
         )
-        # 生成飞书卡片消息
+
         message = push_info.create_feishu_card()
-    
-    # 处理 Pull Request 事件
-    elif event_name == "pull_request":
+
+    elif event_name == "pull_request":  # 处理 Pull Request 事件
         action = os.environ.get("GITHUB_EVENT_ACTION", "")
         pr_merged = os.environ.get("PR_MERGED", "false").lower() == "true"
-        
-        # 创建 PR 信息对象
+
         pr_info = GitHubPRInfo(
             repo_name=os.environ.get("GITHUB_REPOSITORY", ""),
             pr_title=os.environ.get("PR_TITLE", ""),
@@ -109,11 +104,11 @@ def main():
             is_merged=pr_merged,
             source_branch=os.environ.get("GITHUB_HEAD_REF", ""),
             target_branch=os.environ.get("GITHUB_BASE_REF", ""),
-            pr_url=os.environ.get("PR_URL", "")
+            pr_url=os.environ.get("PR_URL", ""),
         )
-        # 生成飞书卡片消息
+
         message = pr_info.create_feishu_card()
-    
+
     else:
         print(f"忽略的事件类型: {event_name}")
         return
